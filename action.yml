@@ -1,0 +1,66 @@
+name: 'Setup Node with Custom NPM Registry'
+description: 'This action installs Node.js and optionally configures access to a custom NPM registry.'
+author: Patryk Waluś <patryk.walus@vaimo.com>
+
+inputs:
+  node-version:
+    description: 'Set the Node.js version for your workflow.'
+    required: true
+  enable-npm-registry:
+    description: 'Enable custom NPM registry access.'
+    required: true
+    default: 'false'
+  working-directory:
+    description: 'Set working directory for your action.'
+    required: false
+  npm-registry-url:
+    description: 'Custom NPM registry URL (e.g., https://registry.npmjs.org or private registry).'
+    required: false
+  npm-registry-scope:
+    description: 'NPM package scope (e.g., @yourcompany).'
+    required: false
+  npm-registry-email:
+    description: 'NPM email for authentication.'
+    required: false
+  npm-registry-user:
+    description: 'NPM username for authentication.'
+    required: false
+  npm-registry-password:
+    description: 'NPM password for authentication.'
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Git checkout
+      uses: vaimo/action-git-checkout@v1
+      with:
+        working-directory: ${{inputs.working-directory}}
+
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{inputs.node-version}}
+        cache: 'yarn'
+
+    - name: Set up npm registry
+      if: ${{ inputs.enable-npm-registry == 'true' }}
+      shell: bash
+      run: |
+        npm install -g npm-cli-login
+
+        # Login to the specified NPM registry
+        npm-cli-login -u ${{ inputs.npm-registry-user }} \
+                      -p ${{ inputs.npm-registry-password }} \
+                      -e ${{ inputs.npm-registry-email }} \
+                      -r ${{ inputs.npm-registry-url }} || exit 1
+
+        # Configure .npmrc for custom registry
+        echo '${{ inputs.npm-registry-scope }}:registry=${{ inputs.npm-registry-url }}' >> `npm config get userconfig`
+
+        # Configure .yarnrc for custom registry
+        echo '"${{ inputs.npm-registry-scope }}:registry" "${{ inputs.npm-registry-url }}"' >> ~/.yarnrc
+
+        # Verify registry setup
+        npm whoami --registry ${{ inputs.npm-registry-url }}
+        
